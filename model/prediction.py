@@ -1,11 +1,14 @@
 import pandas as pd
+import numpy as np
 from os.path import join, dirname
 
 baseline = 0.4
 loveKeyword = {i.strip() for i in open(join(dirname(__file__),'love.txt'))}
 hateKeyword = {i.strip() for i in open(join(dirname(__file__),'hate.txt'))}
+
 reply_time_prop = 0.2
 right_side_weight_prop = 0.2
+wording_prop = 0.2
 
 def matchKeyword(keywords, message):
     n = 0
@@ -38,6 +41,11 @@ def getAverageReplyTime(df):
         currentReply = row['name']
     return time / times
 
+def getLoveWordingRatio(df, owner):
+    love = np.sum(df[df['name'] != owner]['love'])
+    hate = np.sum(df[df['name'] != owner]['hate'])
+    return love/(love+hate)
+
 def predict(filepath, owner):
     df = pd.read_csv(filepath)
     preprocess(df)
@@ -45,15 +53,15 @@ def predict(filepath, owner):
     good = baseline
     
     right_side_weight = getRightSideWeight(df, owner)
-    good += 2 * (0.5-right_side_weight) * right_side_weight_prop
+    right_side_predict = 2 * (0.5-right_side_weight) * right_side_weight_prop
+    good += right_side_predict
 
     reply_time = getAverageReplyTime(df)
-    if reply_time > 5:
-        good -= min((reply_time-5)/20, reply_time_prop)
-    else:
-        good += min((5-reply_time)/20 ,reply_time_prop)
+    reply_time_predict = (-1 * min((reply_time-5)/20, reply_time_prop)) if reply_time > 5 else min((5-reply_time)/20 ,reply_time_prop)
+    good += reply_time_predict
         
+    love_word = getLoveWordingRatio(df, owner)
+    love_word_predict = 2 * (love_word-0.5) * wording_prop
+    good += love_word_predict
     
     return 0 if good < 0 else 1 if good > 1 else good
-
-
